@@ -5,7 +5,7 @@ Modern product teams rely on PRDs to define features, but converting these docum
 
 ## Team members and contribution
 
-### Rishi
+### Rishiraj CR
 **Foundation & Application Skeleton**
 - Set up base Next.js project structure and boilerplate
 - Created initial UI scaffolding (input, preview container, page layout)
@@ -13,7 +13,7 @@ Modern product teams rely on PRDs to define features, but converting these docum
 - Built export shell (StackBlitz/ZIP plumbing and project templates)
 - Established initial code organization and base documentation
 
-### Jojosh
+### Jojosh Vincent
 - Integrated LLM pipeline and multi-agent orchestration
 - Implemented advanced agent flow (analysis -> planning -> design -> generation -> QA)
 - Added Redis-backed shared memory/state for pipeline execution
@@ -117,14 +117,14 @@ Modern product teams rely on PRDs to define features, but converting these docum
 #### PRD Input
 ![PRD Input](./docs/screenshots/PRD_INPUT.png)
 
-#### Component Tree
-![Component Tree](./docs/screenshots/COMPONENT_TREE.png)
+#### Generated Preview
+![Generated Preview](./docs/screenshots/GENERATED_PREVIEW.png)
 
 #### Structured Output
 ![Structured Output](./docs/screenshots/STRUCTURED_OUTPUT.png)
 
-#### Generated Preview
-![Generated Preview](./docs/screenshots/GENERATED_PREVIEW.png)
+#### Component Tree
+![Component Tree](./docs/screenshots/COMPONENT_TREE.png)
 
 #### Generated UI Code
 ![Generated UI Code](./docs/screenshots/GENERATED_UI_CODE.png)
