@@ -1,6 +1,6 @@
 import { extractTsx } from "@/lib/agents/extractTsx";
 
-type TailwindTarget = "v4" | "v3";
+export type TailwindExportTarget = "v4" | "v3";
 
 function assertExportableTsx(tsx: string): void {
   if (tsx.length > 80_000) {
@@ -238,10 +238,13 @@ export default defineConfig({
   };
 }
 
-export async function openInStackBlitz(
+/**
+ * Same Vite + React + Tailwind file tree used for StackBlitz and ZIP download.
+ */
+export function buildViteExportFiles(
   tsx: string,
-  tailwindTarget: TailwindTarget,
-): Promise<void> {
+  tailwindTarget: TailwindExportTarget,
+): Record<string, string> {
   assertExportableTsx(tsx);
   const appTsx = toAppTsx(tsx);
   const files =
@@ -253,6 +256,37 @@ export async function openInStackBlitz(
       throw new Error(`Export template missing required file: ${file}`);
     }
   }
+  return files;
+}
+
+/**
+ * Download the same project as a ZIP (run locally with `npm install` then `npm run dev`).
+ */
+export async function downloadViteProjectZip(
+  tsx: string,
+  tailwindTarget: TailwindExportTarget,
+): Promise<void> {
+  const files = buildViteExportFiles(tsx, tailwindTarget);
+  const { default: JSZip } = await import("jszip");
+  const zip = new JSZip();
+  for (const [path, content] of Object.entries(files)) {
+    zip.file(path, content);
+  }
+  const blob = await zip.generateAsync({ type: "blob" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `ai-ui-export-${tailwindTarget}.zip`;
+  a.rel = "noopener";
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+export async function openInStackBlitz(
+  tsx: string,
+  tailwindTarget: TailwindExportTarget,
+): Promise<void> {
+  const files = buildViteExportFiles(tsx, tailwindTarget);
 
   const sdk = (await import("@stackblitz/sdk")).default;
   sdk.openProject(

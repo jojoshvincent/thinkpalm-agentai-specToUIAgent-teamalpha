@@ -13,7 +13,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "AI UI Generator — agentic PRD to Tailwind",
+  title: "AI UI Component Generator",
   description:
     "Multi-agent pipeline: analyze a PRD, design a component tree, implement Tailwind TSX with live preview.",
 };
@@ -28,7 +28,9 @@ export default function RootLayout({
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body className="min-h-full bg-gray-100 text-gray-900 antialiased">
+        {children}
+      </body>
     </html>
   );
 }
