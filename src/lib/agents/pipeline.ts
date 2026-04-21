@@ -1,6 +1,8 @@
 import type {
   AnalystOutput,
   ArchitectOutput,
+  PipelineState,
+  QaOutput,
   ThemeOutput,
 } from "./schemas";
 import { runAnalyst } from "./runAnalyst";
@@ -9,36 +11,36 @@ import { runImplementer } from "./runImplementer";
 import { runCritic } from "./runCritic";
 import { validateGeneratedTsx } from "./validateGeneratedTsx";
 import { runThemeStylist } from "./runThemeStylist";
-import { runRuntimeValidator } from "./runRuntimeValidator";
+import { writePipelineState } from "./stateStore";
 
 export type AgentId =
-  | "requirements_analyst"
-  | "ui_architect"
-  | "theme_stylist"
-  | "tailwind_implementer"
-  | "runtime_validator"
-  | "ui_critic";
+  | "prd_analyst"
+  | "ux_planner"
+  | "design_agent"
+  | "ui_generator"
+  | "qa_agent";
 
 export type PipelineEvent =
   | { type: "agent_start"; agent: AgentId }
   | {
       type: "agent_complete";
-      agent: "requirements_analyst";
+      agent: "prd_analyst";
       payload: AnalystOutput;
     }
   | {
       type: "agent_complete";
-      agent: "ui_architect";
+      agent: "ux_planner";
       payload: ArchitectOutput;
     }
   | {
       type: "agent_complete";
-      agent: "theme_stylist";
+      agent: "design_agent";
       payload: ThemeOutput;
     }
   | {
       type: "agent_complete";
-      agent: "tailwind_implementer" | "runtime_validator" | "ui_critic";
+      agent: "ui_generator" | "qa_agent";
+      payload?: QaOutput;
     }
   | {
       type: "result";
@@ -57,58 +59,100 @@ export async function* runPipeline(
     tailwindTarget?: "v4" | "v3";
   },
 ): AsyncGenerator<PipelineEvent> {
-  try {
-    const tailwindTarget = options?.tailwindTarget ?? "v4";
-    const maxAttempts = 3;
+  const now = () => new Date().toISOString();
 
-    yield { type: "agent_start", agent: "requirements_analyst" };
+  const state: PipelineState = {
+    jobId: crypto.randomUUID(),
+    createdAt: now(),
+    updatedAt: now(),
+    status: "running",
+    currentAgent: null,
+    prdText,
+    tailwindTarget: options?.tailwindTarget ?? "v4",
+    attempt: 0,
+    maxAttempts: 3,
+    revisionFeedback: "",
+    lastIssues: [],
+    lastTsx: "",
+    analyst: null,
+    architect: null,
+    theme: null,
+    qa: null,
+  };
+
+  const persist = async () => {
+    state.updatedAt = now();
+    await writePipelineState(state);
+  };
+
+  try {
+    await persist();
+
+    yield { type: "agent_start", agent: "prd_analyst" };
+    state.currentAgent = "prd_analyst";
+    await persist();
     const analyst = await runAnalyst(prdText);
+    state.analyst = analyst;
     yield {
       type: "agent_complete",
-      agent: "requirements_analyst",
+      agent: "prd_analyst",
       payload: analyst,
     };
+    await persist();
 
-    yield { type: "agent_start", agent: "ui_architect" };
+    yield { type: "agent_start", agent: "ux_planner" };
+    state.currentAgent = "ux_planner";
+    await persist();
     const architect = await runArchitect(prdText, analyst);
+    state.architect = architect;
     yield {
       type: "agent_complete",
-      agent: "ui_architect",
+      agent: "ux_planner",
       payload: architect,
     };
+    await persist();
 
-    yield { type: "agent_start", agent: "theme_stylist" };
+    yield { type: "agent_start", agent: "design_agent" };
+    state.currentAgent = "design_agent";
+    await persist();
     const theme = await runThemeStylist({
       prdText,
       analyst,
       architect,
-      tailwindTarget,
+      tailwindTarget: state.tailwindTarget,
     });
+    state.theme = theme;
     yield {
       type: "agent_complete",
-      agent: "theme_stylist",
+      agent: "design_agent",
       payload: theme,
     };
+    await persist();
 
-    let lastTsx = "";
-    let revisionFeedback = "";
-    let lastIssues: string[] = [];
+    for (let attempt = 1; attempt <= state.maxAttempts; attempt += 1) {
+      state.attempt = attempt;
+      yield { type: "generation_attempt", attempt, maxAttempts: state.maxAttempts };
+      await persist();
 
-    for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
-      yield { type: "generation_attempt", attempt, maxAttempts };
-      yield { type: "agent_start", agent: "tailwind_implementer" };
+      yield { type: "agent_start", agent: "ui_generator" };
+      state.currentAgent = "ui_generator";
+      await persist();
       const tsx = await runImplementer(prdText, analyst, architect, theme, {
-        tailwindTarget,
-        revisionFeedback,
+        tailwindTarget: state.tailwindTarget,
+        revisionFeedback:
+          state.revisionFeedback ||
+          "Initial generation pass. Produce the best complete version.",
       });
-      yield { type: "agent_complete", agent: "tailwind_implementer" };
-      lastTsx = tsx;
+      yield { type: "agent_complete", agent: "ui_generator" };
+      state.lastTsx = tsx;
+      await persist();
 
       const staticCheck = validateGeneratedTsx(tsx);
       if (!staticCheck.pass) {
-        lastIssues = staticCheck.issues;
-        revisionFeedback = `Revise the component. Fix all issues:\n- ${staticCheck.issues.join("\n- ")}`;
-        if (attempt < maxAttempts) {
+        state.lastIssues = staticCheck.issues;
+        state.revisionFeedback = `Revise the component and fix all issues:\n- ${staticCheck.issues.join("\n- ")}`;
+        await persist();
+        if (attempt < state.maxAttempts) {
           yield {
             type: "generation_feedback",
             message:
@@ -119,67 +163,107 @@ export async function* runPipeline(
         }
       }
 
-      yield { type: "agent_start", agent: "runtime_validator" };
-      const runtimeValidation = await runRuntimeValidator({
-        tsx,
-        tailwindTarget,
-      });
-      yield { type: "agent_complete", agent: "runtime_validator" };
-      if (!runtimeValidation.pass) {
-        lastIssues = runtimeValidation.likelyRuntimeErrors;
-        revisionFeedback = runtimeValidation.repairPrompt;
-        if (attempt < maxAttempts) {
-          yield {
-            type: "generation_feedback",
-            message:
-              "Retrying after runtime validation: " +
-              runtimeValidation.likelyRuntimeErrors.join(" | "),
-          };
-          continue;
-        }
-      }
-
-      yield { type: "agent_start", agent: "ui_critic" };
-      const critic = await runCritic({
+      yield { type: "agent_start", agent: "qa_agent" };
+      state.currentAgent = "qa_agent";
+      await persist();
+      const qa = await runCritic({
         prdText,
         analyst,
         architect,
         theme,
         tsx,
-        tailwindTarget,
+        tailwindTarget: state.tailwindTarget,
       });
-      yield { type: "agent_complete", agent: "ui_critic" };
+      state.qa = qa;
+      yield { type: "agent_complete", agent: "qa_agent", payload: qa };
+      await persist();
 
-      if (critic.pass) {
+      if (qa.decision === "approve") {
+        state.status = "completed";
+        state.currentAgent = null;
+        await persist();
         yield { type: "result", tsx, analyst, architect, theme };
         return;
       }
 
-      lastIssues = critic.issues;
-      revisionFeedback = critic.revisionPrompt;
-      if (attempt < maxAttempts) {
+      if (qa.decision === "reject") {
+        throw new Error(
+          `QA rejected output: ${qa.summary || qa.issues.join(" | ")}`,
+        );
+      }
+
+      state.lastIssues = qa.issues;
+      state.revisionFeedback = [
+        qa.summary,
+        "Fixes to apply:",
+        ...qa.fixes.map((fix) => `- ${fix}`),
+      ].join("\n");
+      await persist();
+
+      if (qa.routeTo === "ux_planner") {
         yield {
           type: "generation_feedback",
           message:
-            `Retrying after critic score ${critic.score}/100. ` +
-            critic.issues.join(" | "),
+            "QA requested layout refinement. Re-planning UX structure before regenerating UI.",
+        };
+        yield { type: "agent_start", agent: "ux_planner" };
+        state.currentAgent = "ux_planner";
+        await persist();
+        const replannedArchitect = await runArchitect(prdText, analyst);
+        state.architect = replannedArchitect;
+        yield {
+          type: "agent_complete",
+          agent: "ux_planner",
+          payload: replannedArchitect,
+        };
+
+        yield { type: "agent_start", agent: "design_agent" };
+        state.currentAgent = "design_agent";
+        await persist();
+        const redesignedTheme = await runThemeStylist({
+          prdText,
+          analyst,
+          architect: replannedArchitect,
+          tailwindTarget: state.tailwindTarget,
+        });
+        state.theme = redesignedTheme;
+        yield {
+          type: "agent_complete",
+          agent: "design_agent",
+          payload: redesignedTheme,
+        };
+        await persist();
+      }
+
+      if (attempt < state.maxAttempts) {
+        yield {
+          type: "generation_feedback",
+          message:
+            `QA requested refinement (${qa.severity}). ` + qa.issues.join(" | "),
         };
       }
     }
 
+    state.status = "completed";
+    state.currentAgent = null;
+    await persist();
     yield {
       type: "result",
-      tsx: lastTsx,
+      tsx: state.lastTsx,
       analyst: {
         ...analyst,
-        constraints: [...analyst.constraints, ...lastIssues],
+        constraints: [...analyst.constraints, ...state.lastIssues],
       },
-      architect,
-      theme,
+      architect: state.architect ?? architect,
+      theme: state.theme ?? theme,
     };
   } catch (e) {
     const message =
       e instanceof Error ? e.message : "Unknown error during generation.";
+    state.status = "failed";
+    state.currentAgent = null;
+    state.lastIssues = [message];
+    await persist();
     yield { type: "error", message };
   }
 }

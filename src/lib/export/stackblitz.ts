@@ -45,7 +45,9 @@ function toAppTsx(tsx: string): string {
     }
   }
 
-  return `${code}
+  return `import React from "react";
+
+${code}
 
 export default function App() {
   return <GeneratedPage />;

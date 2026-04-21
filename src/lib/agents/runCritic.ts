@@ -1,21 +1,11 @@
 import { zodResponseFormat } from "openai/helpers/zod";
-import { z } from "zod";
 import { getModel, getOpenAI } from "./openai";
 import type { AnalystOutput, ArchitectOutput, ThemeOutput } from "./schemas";
+import { qaOutputSchema, type QaOutput } from "./schemas";
 
-const criticOutputSchema = z.object({
-  pass: z.boolean(),
-  score: z.number().min(0).max(100),
-  strengths: z.array(z.string()),
-  issues: z.array(z.string()),
-  revisionPrompt: z.string(),
-});
-
-export type CriticOutput = z.infer<typeof criticOutputSchema>;
-
-const SYSTEM = `You are the UI Quality Critic agent.
+const SYSTEM = `You are the QA Agent for a UI generation pipeline.
 Review generated TSX for visual quality and Tailwind usage quality.
-Your goal is to avoid plain left-aligned HTML-like output.
+Your output is a strict decision: approve, refine, or reject.
 
 Criteria:
 - Visual richness: meaningful color, spacing, typography hierarchy, card/surface styling.
@@ -25,10 +15,16 @@ Criteria:
 - Accessibility: semantic landmarks/labels and readable contrast.
 - Tailwind target compatibility: classes should align with the requested Tailwind target.
 - Theme usage: generated output should visibly apply the provided theme direction, not ignore it.
+- Detect missing states (empty, loading, and error affordances where relevant).
 
 Return strict JSON matching schema.
-Set pass=true only if score >= 75 and there are no severe issues.
-revisionPrompt should be concise, actionable instructions for a rewrite pass.`;
+Set:
+- decision=approve only if there are no blocker issues and quality is acceptable.
+- decision=refine when issues are fixable in another generation pass.
+- decision=reject only for severe or repeated fundamental failures.
+- routeTo=ux_planner when structure/hierarchy is the main problem; otherwise ui_generator.
+- confidence between 0 and 1.
+- fixes must be concrete, short, and actionable.`;
 
 export async function runCritic(input: {
   prdText: string;
@@ -37,7 +33,7 @@ export async function runCritic(input: {
   theme: ThemeOutput;
   tsx: string;
   tailwindTarget: "v4" | "v3";
-}): Promise<CriticOutput> {
+}): Promise<QaOutput> {
   const openai = getOpenAI();
   const model = getModel();
 
@@ -62,14 +58,14 @@ export async function runCritic(input: {
         ),
       },
     ],
-    response_format: zodResponseFormat(criticOutputSchema, "critic_output"),
+    response_format: zodResponseFormat(qaOutputSchema, "qa_output"),
   });
 
   const parsed = completion.choices[0]?.message?.parsed;
   if (!parsed) {
     throw new Error(
       completion.choices[0]?.message?.refusal ??
-        "UI Critic produced no structured output.",
+        "QA agent produced no structured output.",
     );
   }
   return parsed;

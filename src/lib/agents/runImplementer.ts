@@ -2,7 +2,7 @@ import { getModel, getOpenAI } from "./openai";
 import type { AnalystOutput, ArchitectOutput, ThemeOutput } from "./schemas";
 import { extractTsx } from "./extractTsx";
 
-const SYSTEM = `You are the Tailwind Implementer agent. You receive PRD context, analyst JSON, and architect component tree JSON.
+const SYSTEM = `You are the UI Generator agent. You receive PRD context, analyst JSON, UX plan JSON, and design system JSON.
 Your job is to output ONE React component as TSX that renders a **single-page** UI matching the tree and requirements.
 
 Rules:
@@ -22,6 +22,7 @@ Rules:
   - centered or intentionally composed alignment (not plain left-only flow).
 - Ensure the main composition is visually centered using container rhythm (max-w-*, mx-auto, balanced vertical spacing).
 - You will receive a theme object with class suggestions. Apply it consistently so output has strong contrast and visual identity.
+- If revisionFeedback is present, treat it as strict QA guidance and fix all listed issues.
 
 Return TSX only (optionally wrapped in a \`\`\`tsx markdown fence).`;
 

@@ -1,0 +1,20 @@
+AI UI Component Generator - One-Page Overview
+
+AI UI Component Generator is a Next.js application that transforms a raw Product Requirements Document (PRD) into a polished, exportable UI component through a multi-agent pipeline. Instead of relying on one large prompt, the system breaks the process into specialized steps that mirror a practical product workflow: analysis, UX planning, design system definition, code generation, and QA review. This structure improves consistency, traceability, and output quality.
+
+The user experience is straightforward. A user pastes PRD text (or uploads a .txt file), selects a Tailwind target (v4 or v3), and clicks Generate UI. The frontend sends a request to POST /api/generate, and the backend returns progress via NDJSON streaming events. As each stage runs, the interface displays real-time status in the preview area, including a loader, current running agent, attempt count, and a pipeline activity log. Once generation is approved, the preview is rendered in an isolated iframe, and users can inspect structured outputs, view a visual component tree, copy TSX, open in StackBlitz, or download a runnable ZIP project.
+
+At the core is a five-agent orchestration flow:
+1. PRD Analyst converts raw requirements into structured product intent (goals, features, screens, flows, constraints, accessibility notes).
+2. UX Planner produces layout hierarchy, UI patterns, responsiveness plan, and a semantic component tree.
+3. Design System Agent defines tokenized visual direction (spacing, typography, color roles, contrast-aware style classes).
+4. UI Generator creates the final GeneratedPage TSX based on all prior outputs.
+5. QA Agent evaluates completeness and quality, then returns approve, refine, or reject.
+
+Quality is enforced with guardrails. Agent handoffs use strict Zod schemas, retries are capped, confidence values are captured, and static TSX validation checks for structural and styling expectations. If QA requests refinement, the pipeline loops with actionable feedback (either regenerating UI directly or re-planning UX/design when needed). This feedback loop produces higher-quality outputs than a single-pass approach and makes failures diagnosable rather than opaque.
+
+The pipeline also uses Redis-backed shared state to persist run context (jobId, status, active step, attempt count, revision feedback, last issues, and artifacts). This gives deterministic orchestration behavior and creates a foundation for future observability, resumability, and analytics.
+
+From an engineering standpoint, the app is production-oriented for demo and prototyping workflows: it separates concerns, streams progress, validates outputs, and supports immediate handoff into developer tooling. A dedicated test/ suite covers schemas, pipeline behavior, API streaming behavior, and export assembly, helping protect the system against regressions as prompts and orchestration evolve.
+
+In short, AI UI Component Generator is a practical "requirements-to-UI" engine: transparent, quality-gated, and optimized for fast iteration from idea to usable frontend code.

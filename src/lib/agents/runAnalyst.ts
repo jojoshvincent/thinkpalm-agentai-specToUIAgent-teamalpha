@@ -5,6 +5,8 @@ import { analystOutputSchema, type AnalystOutput } from "./schemas";
 const SYSTEM = `You are the Requirements Analyst agent in a multi-agent UI pipeline.
 Read the product requirements document (PRD) and extract structured facts only.
 Do not invent features not implied by the text; if something is unclear, state it in constraints or accessibilityNotes.
+Extract explicit screens and user flows.
+Set confidence between 0 and 1 based on PRD clarity and completeness.
 Output must match the JSON schema exactly (via structured output).`;
 
 export async function runAnalyst(prdText: string): Promise<AnalystOutput> {

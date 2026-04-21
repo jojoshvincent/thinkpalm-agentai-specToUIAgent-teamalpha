@@ -13,12 +13,11 @@ import type {
 import type { AgentId, PipelineEvent } from "@/lib/agents/pipeline";
 
 const AGENT_LABEL: Record<AgentId, string> = {
-  requirements_analyst: "Requirements Analyst",
-  ui_architect: "UI Architect",
-  theme_stylist: "Theme Stylist",
-  tailwind_implementer: "Tailwind Implementer",
-  runtime_validator: "Runtime Validator",
-  ui_critic: "UI Critic",
+  prd_analyst: "PRD Analyst",
+  ux_planner: "UX Planner",
+  design_agent: "Design System Agent",
+  ui_generator: "UI Generator",
+  qa_agent: "QA Agent",
 };
 
 const btnPrimary =
@@ -74,6 +73,7 @@ export function GeneratorApp() {
   const [tailwindTarget, setTailwindTarget] = useState<"v4" | "v3">("v4");
   const [attemptText, setAttemptText] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<string | null>(null);
+  const [activityLog, setActivityLog] = useState<string[]>([]);
   const [exportingStackBlitz, setExportingStackBlitz] = useState(false);
   const [exportingZip, setExportingZip] = useState(false);
 
@@ -93,6 +93,10 @@ export function GeneratorApp() {
     reader.readAsText(f);
   }, []);
 
+  const appendActivity = useCallback((line: string) => {
+    setActivityLog((prev) => [...prev, line]);
+  }, []);
+
   const generate = useCallback(async () => {
     setError(null);
     setTsx(null);
@@ -104,6 +108,7 @@ export function GeneratorApp() {
     setActiveAgent(null);
     setAttemptText(null);
     setFeedback(null);
+    setActivityLog([]);
 
     try {
       const res = await fetch("/api/generate", {
@@ -120,15 +125,18 @@ export function GeneratorApp() {
       await readNdjsonStream(res.body, (event) => {
         if (event.type === "agent_start") {
           setActiveAgent(event.agent);
+          appendActivity(`Started: ${AGENT_LABEL[event.agent]}`);
         } else if (event.type === "agent_complete") {
-          if (event.agent === "requirements_analyst") {
+          appendActivity(`Completed: ${AGENT_LABEL[event.agent]}`);
+          if (event.agent === "prd_analyst") {
             setAnalyst(event.payload);
-          } else if (event.agent === "ui_architect") {
+          } else if (event.agent === "ux_planner") {
             setArchitect(event.payload);
-          } else if (event.agent === "theme_stylist") {
+          } else if (event.agent === "design_agent") {
             setTheme(event.payload);
           }
         } else if (event.type === "result") {
+          appendActivity("Pipeline completed.");
           setTsx(event.tsx);
           setAnalyst(event.analyst);
           setArchitect(event.architect);
@@ -137,9 +145,12 @@ export function GeneratorApp() {
           setAttemptText(null);
         } else if (event.type === "generation_attempt") {
           setAttemptText(`Attempt ${event.attempt} of ${event.maxAttempts}`);
+          appendActivity(`Generation attempt ${event.attempt} of ${event.maxAttempts}`);
         } else if (event.type === "generation_feedback") {
           setFeedback(event.message);
+          appendActivity(`Feedback: ${event.message}`);
         } else if (event.type === "error") {
+          appendActivity(`Error: ${event.message}`);
           throw new Error(event.message);
         }
       });
@@ -149,7 +160,7 @@ export function GeneratorApp() {
     } finally {
       setLoading(false);
     }
-  }, [prdText, tailwindTarget]);
+  }, [appendActivity, prdText, tailwindTarget]);
 
   const copyTsx = useCallback(async () => {
     if (!tsx) return;
@@ -341,14 +352,28 @@ export function GeneratorApp() {
                 iframeHeightClass="h-[min(58vh,640px)]"
               />
             ) : loading ? (
-              <PreviewGenerating
-                agentLine={
-                  activeAgent != null
-                    ? `Running: ${AGENT_LABEL[activeAgent]}`
-                    : "Starting pipeline…"
-                }
-                attemptText={attemptText}
-              />
+              <div className="flex min-h-0 flex-1 flex-col gap-3">
+                <PreviewGenerating
+                  agentLine={
+                    activeAgent != null
+                      ? `Running: ${AGENT_LABEL[activeAgent]}`
+                      : "Starting pipeline…"
+                  }
+                  attemptText={attemptText}
+                />
+                {activityLog.length > 0 ? (
+                  <div className="max-h-40 overflow-auto rounded-md border border-gray-200 bg-gray-50 p-3">
+                    <p className="mb-2 text-xs font-medium uppercase tracking-wide text-gray-500">
+                      Pipeline activity
+                    </p>
+                    <ul className="space-y-1 text-xs text-gray-700">
+                      {activityLog.map((line, idx) => (
+                        <li key={`${idx}-${line}`}>{line}</li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : null}
+              </div>
             ) : (
               <div className="flex flex-1 flex-col items-center justify-center rounded-md border border-dashed border-gray-300 bg-gray-50 px-4 py-10 text-center">
                 <p className="max-w-sm text-sm text-gray-600">
@@ -377,7 +402,7 @@ export function GeneratorApp() {
                 className="rounded-md border border-gray-300 bg-gray-50 p-3"
               >
                 <summary className="cursor-pointer text-sm font-medium text-gray-800">
-                  Requirements Analyst
+                  PRD Analyst
                 </summary>
                 <pre className="mt-3 max-h-48 overflow-auto whitespace-pre-wrap break-words rounded-md border border-gray-200 bg-white p-3 font-mono text-xs text-gray-800">
                   {JSON.stringify(analyst, null, 2)}
@@ -390,7 +415,7 @@ export function GeneratorApp() {
                 className="rounded-md border border-gray-300 bg-gray-50 p-3"
               >
                 <summary className="cursor-pointer text-sm font-medium text-gray-800">
-                  UI Architect
+                  UX Planner
                 </summary>
                 <pre className="mt-3 max-h-48 overflow-auto whitespace-pre-wrap break-words rounded-md border border-gray-200 bg-white p-3 font-mono text-xs text-gray-800">
                   {JSON.stringify(architect, null, 2)}
@@ -403,7 +428,7 @@ export function GeneratorApp() {
                 className="rounded-md border border-gray-300 bg-gray-50 p-3"
               >
                 <summary className="cursor-pointer text-sm font-medium text-gray-800">
-                  Theme Stylist
+                  Design System Agent
                 </summary>
                 <pre className="mt-3 max-h-48 overflow-auto whitespace-pre-wrap break-words rounded-md border border-gray-200 bg-white p-3 font-mono text-xs text-gray-800">
                   {JSON.stringify(theme, null, 2)}

@@ -1,36 +1,136 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# SpecToUI Agent
 
-## Getting Started
+## Problem statement
+Modern product teams rely on PRDs to define features, but converting these documents into working UI remains a manual, time-consuming process. Developers must interpret requirements, design layouts, structure component hierarchies, and implement styling from scratch. This results in delays, inconsistencies across implementations, and reduced productivity—especially in fast-paced environments where rapid iteration is critical.
 
-First, run the development server:
+## Team members and contribution
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+### Rishi
+**Foundation & Application Skeleton**
+- Set up base Next.js project structure and boilerplate
+- Created initial UI scaffolding (input, preview container, page layout)
+- Added core API route structure and baseline request/response flow
+- Built export shell (StackBlitz/ZIP plumbing and project templates)
+- Established initial code organization and base documentation
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### Jojosh
+- Integrated LLM pipeline and multi-agent orchestration
+- Implemented advanced agent flow (analysis -> planning -> design -> generation -> QA)
+- Added Redis-backed shared memory/state for pipeline execution
+- Introduced guardrails:
+  - strict schema contracts
+  - retry policies
+  - validation checks
+  - QA refine/reject loop
+- Added streaming progress behavior and reliability fixes
+- Expanded test coverage for pipeline, API streaming, schemas, and exports
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Tech stack with versions
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+### Core
+- Next.js `16.2.4`
+- React `19.2.4`
+- React DOM `19.2.4`
+- TypeScript `^5`
+- OpenAI SDK `^6.34.0`
+- Zod `^4.3.6`
+- Redis client `^5.12.1`
 
-## Learn More
+### Export / Utilities
+- `@stackblitz/sdk` `^1.11.0`
+- `jszip` `^3.10.1`
 
-To learn more about Next.js, take a look at the following resources:
+### Styling
+- Tailwind CSS `^4`
+- `@tailwindcss/postcss` `^4`
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+### Quality / Tooling
+- ESLint `^9`
+- `eslint-config-next` `16.2.4`
+- Vitest `^4.1.4`
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Project overview
+**SpecToUI Agent** converts raw PRDs into export-ready UI code using a multi-agent pipeline.
 
-## Deploy on Vercel
+### End-to-end flow
+1. User submits PRD text (paste/upload) and selects Tailwind target (`v4` or `v3`).
+2. Backend runs a 5-agent pipeline:
+   - PRD Analyst
+   - UX Planner
+   - Design System Agent
+   - UI Generator
+   - QA Agent (approve/refine/reject)
+3. Pipeline events are streamed to the frontend as NDJSON for live progress updates.
+4. Generated UI is previewed in-browser and can be exported as:
+   - TSX copy
+   - StackBlitz project
+   - ZIP (Vite + React template)
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+### Reliability features
+- Strict schema validation between agents
+- Retry loops with bounded attempts
+- QA-driven refinement routing
+- Redis-backed shared pipeline state
+- Automated tests for pipeline, API stream, schema contracts, and export behavior
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Setup steps
+1. Clone the repository.
+2. Install dependencies:
+   ```bash
+   npm install
+   ```
+3. Configure environment variables:
+   - Create `.env.local`
+   - Add:
+     ```env
+     OPENAI_API_KEY=your_openai_key
+     # Optional
+     OPENAI_MODEL=gpt-4o-mini
+     # Optional (recommended for shared state)
+     REDIS_URL=redis://localhost:6379
+     ```
+4. Ensure Redis is running if you use `REDIS_URL`.
+
+## How to run locally (step by step)
+1. Install packages:
+   ```bash
+   npm install
+   ```
+2. Add environment variables in `.env.local` (see above).
+3. Start dev server:
+   ```bash
+   npm run dev
+   ```
+4. Open:
+   - `http://localhost:3000`
+5. Paste/upload a PRD, click **Generate UI**, and monitor live pipeline progress.
+6. Optional quality checks:
+   ```bash
+   npm run lint
+   npm test
+   npm run build
+   ```
+
+## Additional resources
+### Screenshots
+
+#### PRD Input
+![PRD Input](./docs/screenshots/PRD_INPUT.png)
+
+#### Component Tree
+![Component Tree](./docs/screenshots/COMPONENT_TREE.png)
+
+#### Structured Output
+![Structured Output](./docs/screenshots/STRUCTURED_OUTPUT.png)
+
+#### Generated Preview
+![Generated Preview](./docs/screenshots/GENERATED_PREVIEW.png)
+
+#### Generated UI Code
+![Generated UI Code](./docs/screenshots/GENERATED_UI_CODE.png)
+
+#### StackBlitz Output
+![StackBlitz Output](./docs/screenshots/STACKBLITZ_OUTPUT.png)
+
+### Demo video link
+- `https://www.loom.com/share/871436e3ddfc455fbecd968ecd91bb26`
